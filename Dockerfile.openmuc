@@ -1,0 +1,15 @@
+FROM eclipse-temurin:17-jre-jammy
+
+# This is where we mount the OpenMUC framework from the host
+WORKDIR /app/framework
+
+# You don't need COPY here, the whole framework comes from the volume
+# COPY openmuc.jar /app/app.jar   # <-- remove this
+# COPY felix.jar /app/app.jar     # <-- not needed either
+
+EXPOSE 8888
+
+ENV JAVA_OPTS=""
+
+# Run Felix from the framework root
+ENTRYPOINT ["sh", "-c", "java -Dgosh.args=--nointeractive $JAVA_OPTS -jar felix/felix.jar"]

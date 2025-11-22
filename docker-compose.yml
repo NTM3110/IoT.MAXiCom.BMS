@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: openmuc          # DB name
+      POSTGRES_USER: postgres       # superuser used by init.sql
+      POSTGRES_PASSWORD: postgres   # change if you want
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pgdata:/var/lib/postgresql/data
+
+  openmuc:
+    build:
+      context: .
+      dockerfile: Dockerfile.openmuc
+    image: openmuc:latest
+    container_name: openmuc
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "8888:8888"
+    volumes:
+      # Option B (recommended): mount entire conf dir
+      - /home/shou/Documents/ATEnergy/openmuc/framework:/app/framework
+
+    # Inside this JAR you must configure:
+    # jdbc:postgresql://postgres:5432/openmuc
+    # user=openmuc_user, password=openmuc
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: bms-backend:latest
+    container_name: bms-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - openmuc
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/openmuc
+      SPRING_DATASOURCE_USERNAME: openmuc_user
+      SPRING_DATASOURCE_PASSWORD: openmuc
+      OPENMUC_URL: http://openmuc:8888
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: bms-frontend:latest
+    container_name: bms-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+      - openmuc
+    ports:
+      - "8080:8080"
+    environment:
+      BACKEND_URL: "http://bms-backend:8081"
+      OPENMUC_URL: "http://openmuc:8888"
+
+volumes:
+  pgdata:

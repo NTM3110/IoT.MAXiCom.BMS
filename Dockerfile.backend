@@ -1,0 +1,13 @@
+FROM eclipse-temurin:21-jre-jammy
+
+WORKDIR /app
+
+# Copy backend JAR
+COPY bms-backend-1.jar /app/app.jar
+
+# Port that Spring Boot listens on INSIDE container
+EXPOSE 8081
+
+ENV JAVA_OPTS=""
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
