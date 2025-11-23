@@ -1,13 +1,21 @@
 FROM eclipse-temurin:21-jre-jammy
 
+# ====== Set timezone ======
+ENV TZ=Asia/Bangkok
+RUN apt-get update && \
+    apt-get install -y tzdata && \
+    ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
+    rm -rf /var/lib/apt/lists/*
+
+# JVM dùng đúng timezone Asia/Bangkok
+ENV JAVA_OPTS="-Duser.timezone=Asia/Bangkok"
+
 WORKDIR /app
 
 # Copy backend JAR
 COPY bms-backend-1.jar /app/app.jar
 
-# Port that Spring Boot listens on INSIDE container
+# Port mà Spring Boot listen bên trong container
 EXPOSE 8081
-
-ENV JAVA_OPTS=""
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

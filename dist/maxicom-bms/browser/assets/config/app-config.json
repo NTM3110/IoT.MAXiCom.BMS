@@ -1,0 +1,22 @@
+{
+  "serialPorts": [
+    {
+      "id": "serial0",
+      "alias": "Port 1",
+      "devicePath": "/dev/ttyS1",
+      "channel": "dev_serial_comm_0"
+    },
+    {
+      "id": "serial1",
+      "alias": "Port 2",
+      "devicePath": "/dev/ttyS7",
+      "channel": "dev_serial_comm_1"
+    },
+    {
+      "id": "serial2",
+      "alias": "Port 3",
+      "devicePath": "/dev/ttyS9",
+      "channel": "dev_serial_comm_2"
+    }
+  ]
+}

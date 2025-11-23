@@ -65,12 +65,27 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 
 
 -- ============================================
--- 7) Insert default account values
+-- 7) Insert default account / config values
 -- ============================================
+
+-- numeric config: dev_serial_comm_number = 3
+INSERT INTO latest_values (channelid, value_type, value_double, updated_at)
+VALUES
+    ('dev_serial_comm_number', 'D', 3, NOW())
+ON CONFLICT (channelid) DO UPDATE
+SET value_double = EXCLUDED.value_double,
+    value_type   = EXCLUDED.value_type,
+    updated_at   = EXCLUDED.updated_at;
+
+-- string configs (accounts, serial ports, site name)
 INSERT INTO latest_values (channelid, value_type, value_string, updated_at)
 VALUES
     ('account_1_username', 'S', 'admin', NOW()),
-    ('account_1_password', 'S', 'admin', NOW())
+    ('account_1_password', 'S', 'admin', NOW()),
+    ('dev_serial_comm_0', 'S', '/dev/ttyS1:RTU:SERIAL_ENCODING_RTU:9600:DATABITS_8:PARITY_NONE:STOPBITS_1:ECHO_FALSE:FLOWCONTROL_NONE:FLOWCONTROL_NONE', NOW()),
+    ('dev_serial_comm_1', 'S', '/dev/ttyS7:RTU:SERIAL_ENCODING_RTU:9600:DATABITS_8:PARITY_NONE:STOPBITS_1:ECHO_FALSE:FLOWCONTROL_NONE:FLOWCONTROL_NONE', NOW()),
+    ('dev_serial_comm_2', 'S', '/dev/ttyS9:RTU:SERIAL_ENCODING_RTU:9600:DATABITS_8:PARITY_NONE:STOPBITS_1:ECHO_FALSE:FLOWCONTROL_NONE:FLOWCONTROL_NONE', NOW()),
+    ('site_name_1',       'S', 'Battery Monitoring System', NOW())
 ON CONFLICT (channelid) DO UPDATE
 SET value_string = EXCLUDED.value_string,
     value_type   = EXCLUDED.value_type,
