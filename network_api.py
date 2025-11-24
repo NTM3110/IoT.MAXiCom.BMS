@@ -9,8 +9,8 @@ CORS(app)
 
 # Bản đồ tên cổng
 INTERFACES_MAP = {
-    "eth0": "Port 1",
-    "eth1": "Port 2"
+    "eth1": "WAN 0",
+    "eth0": "WAN 1"
 }
 
 def get_connection_name(iface):
