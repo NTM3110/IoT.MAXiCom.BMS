@@ -7,23 +7,23 @@ import time
 app = Flask(__name__)
 CORS(app)
 
-# CẤU HÌNH TÊN CARD MẠNG (Bạn cần check 'ip addr' trên máy thật để điền đúng)
-# Ví dụ máy thật là enp3s0, enp4s0 thì sửa key bên dưới cho khớp
+# Bản đồ tên cổng
 INTERFACES_MAP = {
     "eth0": "Port 1",
     "eth1": "Port 2"
 }
 
 def get_connection_name(iface):
-    """Tìm tên Connection của NetworkManager đang quản lý interface này"""
+    """Tìm tên Connection của NetworkManager"""
     try:
-        # Tìm connection đang active
+        # Ưu tiên tìm connection đang active
         result = subprocess.check_output(["nmcli", "-t", "-f", "NAME,DEVICE", "connection", "show", "--active"], stderr=subprocess.DEVNULL).decode()
         for line in result.splitlines():
             if ":" in line:
                 name, device = line.split(":")
                 if device == iface:
                     return name
+        
         # Nếu không active, tìm connection bất kỳ gắn với iface
         result = subprocess.check_output(["nmcli", "-t", "-f", "NAME,DEVICE", "connection", "show"], stderr=subprocess.DEVNULL).decode()
         for line in result.splitlines():
@@ -46,7 +46,7 @@ def get_interface_details(iface_name):
         "dhcp": False
     }
 
-    # 1. Lấy IP thực tế từ hệ thống
+    # 1. Lấy IP thực tế từ hệ thống (netifaces)
     try:
         if iface_name in netifaces.interfaces():
             addrs = netifaces.ifaddresses(iface_name)
@@ -54,8 +54,7 @@ def get_interface_details(iface_name):
                 ipv4 = addrs[netifaces.AF_INET][0]
                 data["ipAddress"] = ipv4.get('addr')
                 data["subnetMask"] = ipv4.get('netmask')
-
-            # Gateway
+            
             gws = netifaces.gateways()
             if 'default' in gws and netifaces.AF_INET in gws['default']:
                 gw_info = gws['default'][netifaces.AF_INET]
@@ -64,11 +63,11 @@ def get_interface_details(iface_name):
     except:
         pass
 
-    # 2. Lấy cấu hình từ NetworkManager
+    # 2. Lấy cấu hình từ NMCLI (để biết DHCP hay Static)
     try:
         method = subprocess.check_output(["nmcli", "-g", "ipv4.method", "dev", "show", iface_name], stderr=subprocess.DEVNULL).decode().strip()
         data["dhcp"] = (method == "auto")
-
+        
         dns_output = subprocess.check_output(["nmcli", "-g", "IP4.DNS", "dev", "show", iface_name], stderr=subprocess.DEVNULL).decode().strip()
         if dns_output:
             data["dns"] = dns_output.replace(" | ", ",").replace(" ", ",")
@@ -77,82 +76,92 @@ def get_interface_details(iface_name):
 
     return data
 
+@app.route('/', methods=['GET'])
 @app.route('/api/network', methods=['GET'])
 def get_all_networks():
     results = []
-    # Lấy danh sách interface từ cấu hình MAP hoặc tự động quét
-    # Ở đây dùng MAP để đảm bảo thứ tự và tên hiển thị
     for iface in INTERFACES_MAP.keys():
         results.append(get_interface_details(iface))
     return jsonify(results)
 
-@app.route('/api/network/<iface_name>', methods=['GET'])
-def get_network(iface_name):
-    return jsonify(get_interface_details(iface_name))
-
+@app.route('/<iface_name>', methods=['PUT'])
 @app.route('/api/network/<iface_name>', methods=['PUT'])
 def update_network(iface_name):
-    # Cho phép update kể cả nếu interface không nằm trong MAP (linh hoạt)
-
+    print(f"--- Updating Network: {iface_name} ---")
     data = request.json
     is_dhcp = data.get('dhcp', False)
-
+    
+    # Tìm tên kết nối hiện tại
     conn_name = get_connection_name(iface_name)
+    
+    # Nếu chưa có connection nào, tạo mới
     if not conn_name:
         conn_name = f"Wired connection {iface_name}"
-        subprocess.run(["nmcli", "con", "add", "type", "ethernet", "ifname", iface_name, "con-name", conn_name])
+        print(f"Creating new connection: {conn_name}")
+        try:
+            subprocess.run(["nmcli", "con", "add", "type", "ethernet", "ifname", iface_name, "con-name", conn_name], check=True)
+        except subprocess.CalledProcessError as e:
+            return jsonify({"error": "Failed to create connection", "details": str(e)}), 500
 
     try:
+        # Xây dựng lệnh MODIFY
         cmds = ["nmcli", "con", "modify", conn_name]
-
+        
         if is_dhcp:
+            # Chuyển sang DHCP
             cmds.extend(["ipv4.method", "auto"])
+            # Xóa các thiết lập tĩnh cũ để sạch sẽ
             cmds.extend(["ipv4.addresses", "", "ipv4.gateway", "", "ipv4.dns", ""])
         else:
+            # Chuyển sang Static
             ip = data.get('ipAddress')
             mask = data.get('subnetMask')
-            gateway = data.get('gateway') # Có thể null hoặc rỗng
-            dns = data.get('dns')         # Có thể null hoặc rỗng
+            gateway = data.get('gateway')
+            dns = data.get('dns')
 
-            # --- KIỂM TRA BẮT BUỘC ---
             if not ip or not mask:
                  return jsonify({"error": "IP Address and Subnet Mask are required."}), 400
 
-            # Tính CIDR (ví dụ: 24) từ Subnet Mask
+            # Tính CIDR (VD: 24)
             prefix = sum(bin(int(x)).count('1') for x in mask.split('.'))
             cidr = f"{ip}/{prefix}"
 
             cmds.extend(["ipv4.method", "manual"])
             cmds.extend(["ipv4.addresses", cidr])
-
-            # --- XỬ LÝ GATEWAY (Không bắt buộc) ---
+            
+            # Xử lý Gateway
             if gateway and gateway.strip():
                 cmds.extend(["ipv4.gateway", gateway.strip()])
             else:
-                cmds.extend(["ipv4.gateway", ""]) # Xóa gateway cũ nếu không nhập mới
+                cmds.extend(["ipv4.gateway", ""]) # Xóa gateway cũ
 
-            # --- XỬ LÝ DNS (Không bắt buộc) ---
+            # Xử lý DNS
             if dns and dns.strip():
                 cmds.extend(["ipv4.dns", dns.strip()])
             else:
                 cmds.extend(["ipv4.dns", ""])
 
-        # Thực thi lệnh
+        # Thực thi lệnh modify
         print(f"Executing: {' '.join(cmds)}")
-        subprocess.run(cmds, check=True)
+        subprocess.run(cmds, check=True, capture_output=True, text=True)
 
-        # Khởi động lại connection
+        # Restart connection để áp dụng
+        print("Restarting connection...")
         subprocess.run(["nmcli", "con", "down", conn_name], check=True)
         subprocess.run(["nmcli", "con", "up", conn_name], check=True)
-
-        time.sleep(3) # Đợi lâu hơn chút để mạng ổn định
-
+        
+        # Đợi 1 chút cho mạng nhận IP
+        time.sleep(3)
+        
         return jsonify(get_interface_details(iface_name)), 200
 
     except subprocess.CalledProcessError as e:
-        return jsonify({"error": "Failed to apply network settings", "details": str(e)}), 500
+        err_msg = e.stderr if e.stderr else str(e)
+        print(f"Error: {err_msg}")
+        return jsonify({"error": "Failed to configure network", "details": err_msg.strip()}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Chạy cổng 5000
     app.run(host='0.0.0.0', port=5000)
