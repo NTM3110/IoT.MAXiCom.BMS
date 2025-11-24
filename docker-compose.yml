@@ -7,7 +7,7 @@ services:
     container_name: postgres
     restart: unless-stopped
     environment:
-      TZ: Asia/Bangkok
+      TZ: Asia/Ho_Chi_Minh
       POSTGRES_DB: openmuc
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -17,7 +17,7 @@ services:
       - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
       - ./pgdata:/var/lib/postgresql/data
 
-  # 2. OPENMUC
+  # 2. OPENMUC (Framework)
   openmuc:
     build:
       context: .
@@ -48,14 +48,26 @@ services:
     ports:
       - "8081:8081"
     environment:
-      TZ: Asia/Bangkok
+      TZ: Asia/Ho_Chi_Minh
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/openmuc
       SPRING_DATASOURCE_USERNAME: openmuc_user
       SPRING_DATASOURCE_PASSWORD: openmuc
-      # Backend gọi OpenMUC qua tên service 'openmuc'
       OPENMUC_URL: http://openmuc:8888
 
-  # 4. FRONTEND (Angular + Node Proxy)
+  # 4. NETWORK SERVICE (Python - Host Mode)
+  # Service này chạy script Python để tương tác trực tiếp với NetworkManager của máy thật
+  network-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.network
+    container_name: network-service
+    restart: unless-stopped
+    privileged: true
+    network_mode: host  # Bắt buộc để nhìn thấy card mạng thật
+    volumes:
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket
+
+  # 5. FRONTEND (Angular + Node Proxy)
   frontend:
     build:
       context: .
@@ -66,12 +78,15 @@ services:
     depends_on:
       - backend
       - openmuc
+      - network-service
     ports:
-      # Map cổng 8080 máy chủ vào cổng 80 container (nơi server.js chạy)
-      - "8080:80"
+      - "80:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Để gọi về network-service đang chạy ở host
     environment:
-      TZ: Asia/Bangkok
-      # Frontend gọi Backend qua tên container 'bms-backend'
+      TZ: Asia/Ho_Chi_Minh
+      # Proxy tới Backend và OpenMUC qua mạng nội bộ Docker
       API_TARGET_8081: "http://bms-backend:8081"
-      # Frontend gọi OpenMUC qua tên container 'openmuc'
       API_TARGET_8888: "http://openmuc:8888"
+      # Proxy tới Network Service qua cổng 5000 của Host (do dùng network_mode: host)
+      API_TARGET_NETWORK: "http://host.docker.internal:5000"

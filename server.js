@@ -9,6 +9,7 @@ const PORT = process.env.PORT || 80;
 // Nếu không có biến môi trường thì mới fallback về localhost (dev)
 const TARGET_8081 = process.env.API_TARGET_8081 || 'http://localhost:8081';
 const TARGET_8888 = process.env.API_TARGET_8888 || 'http://localhost:8888';
+const TARGET_NETWORK = process.env.API_TARGET_NETWORK || 'http://host.docker.internal:5000';
 
 console.log(`Connecting to Backend at: ${TARGET_8081}`);
 console.log(`Connecting to OpenMUC at: ${TARGET_8888}`);
@@ -40,6 +41,12 @@ app.use('/api', createProxyMiddleware({
     logger: console
 }));
 
+app.use('/api/network', createProxyMiddleware({
+    target: TARGET_NETWORK,
+    changeOrigin: true,
+    // Không cần pathRewrite vì Python API cũng lắng nghe ở /api/network
+    logger: console
+}));
 // --- CẤU HÌNH STATIC FILES ---
 // Đường dẫn này phải khớp với lệnh COPY trong Dockerfile
 // Vì ta COPY dist ./dist -> Trong container là /app/dist/maxicom-bms/browser (nếu Angular 17+)
