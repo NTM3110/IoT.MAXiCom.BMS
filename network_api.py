@@ -197,7 +197,7 @@ def update_network(iface_name):
         print(f"Executing on {conn_name}: {' '.join(cmds)}")
         subprocess.run(cmds, check=True, capture_output=True, text=True)
 
-        # BƯỚC 3: Kích hoạt
+        # BƯỚC 3: Kích hoạt cấu hình
         # Down/Up để áp dụng
         subprocess.run(["nmcli", "con", "down", conn_name], check=True)
         subprocess.run(["nmcli", "con", "up", conn_name], check=True)
