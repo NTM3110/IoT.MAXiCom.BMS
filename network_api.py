@@ -23,14 +23,14 @@ def enforce_single_connection(iface):
     Xóa hết các profile rác (Wired connection 1, 2...)
     """
     target_name = get_target_conn_name(iface)
-
+    
     try:
         # 1. Lấy danh sách tất cả connection của interface này
         output = subprocess.check_output(
-            ["nmcli", "-t", "-f", "UUID,NAME,DEVICE", "connection", "show"],
+            ["nmcli", "-t", "-f", "UUID,NAME,DEVICE", "connection", "show"], 
             stderr=subprocess.DEVNULL
         ).decode()
-
+        
         existing_uuids = []
         target_exists = False
 
@@ -38,9 +38,9 @@ def enforce_single_connection(iface):
             if not line.strip(): continue
             parts = line.split(":")
             if len(parts) < 3: continue
-
+            
             uuid, name, device = parts[0], parts[1], parts[2]
-
+            
             # Nếu connection này thuộc về interface đang xét
             if device == iface:
                 if name == target_name:
@@ -48,7 +48,7 @@ def enforce_single_connection(iface):
                 else:
                     # Nếu không phải tên chuẩn -> Đánh dấu để xóa
                     existing_uuids.append(uuid)
-
+            
             # Trường hợp profile không gắn device nhưng tên trùng tên rác thường gặp
             elif device == "" and (name.startswith("Wired connection") or name == "System " + iface):
                  # Cẩn thận hơn: Có thể xóa nhầm nếu không check kỹ, nhưng ở host mode thường ok
@@ -63,12 +63,12 @@ def enforce_single_connection(iface):
         if not target_exists:
             print(f"[{iface}] Creating standard profile: {target_name}")
             subprocess.run([
-                "nmcli", "con", "add",
-                "type", "ethernet",
-                "ifname", iface,
+                "nmcli", "con", "add", 
+                "type", "ethernet", 
+                "ifname", iface, 
                 "con-name", target_name
             ], check=True)
-
+            
         return target_name
 
     except Exception as e:
@@ -94,7 +94,7 @@ def get_interface_details(iface_name):
                 ipv4 = addrs[netifaces.AF_INET][0]
                 data["ipAddress"] = ipv4.get('addr')
                 data["subnetMask"] = ipv4.get('netmask')
-
+            
             gws = netifaces.gateways()
             if 'default' in gws and netifaces.AF_INET in gws['default']:
                 gw_info = gws['default'][netifaces.AF_INET]
@@ -107,21 +107,21 @@ def get_interface_details(iface_name):
     # Đảm bảo ta đọc đúng cái ta vừa ghi
     try:
         target_name = get_target_conn_name(iface_name)
-
+        
         # Kiểm tra xem profile có tồn tại không
         check = subprocess.run(
-            ["nmcli", "con", "show", target_name],
-            stdout=subprocess.DEVNULL,
+            ["nmcli", "con", "show", target_name], 
+            stdout=subprocess.DEVNULL, 
             stderr=subprocess.DEVNULL
         )
-
+        
         if check.returncode == 0:
             # Lấy method
             method = subprocess.check_output(
                 ["nmcli", "-g", "ipv4.method", "con", "show", target_name],
                 stderr=subprocess.DEVNULL
             ).decode().strip()
-
+            
             data["dhcp"] = (method == "auto")
 
             if method == "manual":
@@ -153,16 +153,16 @@ def update_network(iface_name):
     print(f"--- Updating {iface_name} ---")
     data = request.json
     is_dhcp = data.get('dhcp', False)
-
+    
     # BƯỚC 1: Chuẩn hóa Connection (Xóa cũ, giữ 1 cái chuẩn tên MAXiCom-...)
     conn_name = enforce_single_connection(iface_name)
-
+    
     if not conn_name:
         return jsonify({"error": "Failed to manage connection profile"}), 500
 
     try:
         cmds = ["nmcli", "con", "modify", conn_name]
-
+        
         if is_dhcp:
             # DHCP
             cmds.extend(["ipv4.method", "auto"])
@@ -182,7 +182,7 @@ def update_network(iface_name):
 
             cmds.extend(["ipv4.method", "manual"])
             cmds.extend(["ipv4.addresses", cidr])
-
+            
             if gateway and gateway.strip():
                 cmds.extend(["ipv4.gateway", gateway.strip()])
             else:
@@ -201,9 +201,9 @@ def update_network(iface_name):
         # Down/Up để áp dụng
         subprocess.run(["nmcli", "con", "down", conn_name], check=True)
         subprocess.run(["nmcli", "con", "up", conn_name], check=True)
-
+        
         time.sleep(2)
-
+        
         return jsonify(get_interface_details(iface_name)), 200
 
     except subprocess.CalledProcessError as e:
