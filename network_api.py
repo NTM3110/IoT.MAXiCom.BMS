@@ -7,7 +7,7 @@ import time
 app = Flask(__name__)
 CORS(app)
 
-# Map đúng theo thực tế bạn mô tả
+# Map đúng theo thực tế bạn mô ta
 INTERFACES_MAP = {
     "eth1": "WAN 0",
     "eth0": "WAN 1"
