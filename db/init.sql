@@ -90,3 +90,63 @@ ON CONFLICT (channelid) DO UPDATE
 SET value_string = EXCLUDED.value_string,
     value_type   = EXCLUDED.value_type,
     updated_at   = EXCLUDED.updated_at;
+
+-- =======================================
+-- 1) Total I tables
+-- =======================================
+CREATE TABLE str1_total_I (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+CREATE TABLE str2_total_I (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+-- =======================================
+-- 2) Ambient Temperature tables
+-- =======================================
+CREATE TABLE str1_ambient_T (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+CREATE TABLE str2_ambient_T (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+-- =======================================
+-- 3) String SOC tables
+-- =======================================
+CREATE TABLE str1_string_SOC (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+CREATE TABLE str2_string_SOC (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+-- =======================================
+-- 4) String SOH tables
+-- =======================================
+CREATE TABLE str1_string_SOH (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
+
+CREATE TABLE str2_string_SOH (
+    time TIMESTAMP NOT NULL,
+    flag INTEGER,
+    "VALUE" DOUBLE PRECISION
+);
